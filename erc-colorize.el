@@ -120,16 +120,32 @@ used. If none, take the face of the least active user."
 (defun erc-colorize-message ()
   "Function used in `erc-insert-modify-hook' to apply the same face to a
 message coming from a user."
-  (erc-find-parsed-property)
+  (goto-char (or (erc-find-parsed-property) (point-min)))
   (let* ((vector (erc-get-parsed-vector (point)))
          (nickuserhost (erc-get-parsed-vector-nick vector))
          (nickname (and nickuserhost
                         (nth 0 (erc-parse-user nickuserhost))))
          (match-face (erc-colorize-color nickname)))
+
     (when match-face
-      (erc-put-text-property
-       (point-min) (point-max)
-       'face match-face))))
+      (let* ((start (point))
+             (end (next-single-property-change start 'face))
+             (faces '()))
+        (if end
+            (while end
+              (setq faces (get-text-property start 'face))
+              (when (and faces (not (consp faces)))
+                (setq faces (list faces)))
+              (erc-put-text-property start end
+                                     'face (append faces (list match-face)))
+              (goto-char end)
+              (setq start end
+                    end (next-single-property-change start 'face)))
+
+          (erc-put-text-property (point-min) (point-max)
+                                 'face match-face)))))
+
+    (erc-restore-text-properties))
 
 
 (provide 'erc-colorize)
